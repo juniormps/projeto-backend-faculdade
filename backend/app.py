@@ -4,10 +4,12 @@ from datetime import datetime, timezone
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from pymongo import MongoClient, ReturnDocument
 
 # Inicializa a aplicação Flask
 app = Flask(__name__)
+CORS(app, resources={r"/projects.*": {"origins": "http://localhost:3000"}})
 
 mongo_client = MongoClient(os.environ["MONGO_URI"])
 database = mongo_client.get_default_database()
