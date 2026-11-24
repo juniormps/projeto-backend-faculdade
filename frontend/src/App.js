@@ -5,6 +5,8 @@ import "./App.css";
 
 const EMPTY_FORM = { name: "", description: "", status: "" };
 const FORM_FIELDS = ["name", "description", "status"];
+const STATUS_OPTIONS = ["Planejado", "Em andamento", "Concluído"];
+const ALL_STATUSES = "Todos";
 
 function getErrorMessage(error, fallback) {
   return error.response?.data?.error || fallback;
@@ -190,9 +192,7 @@ function ProjectForm({ mode, initialProject, onCancel, onSuccess }) {
           <label htmlFor="project-status">Status</label>
           <select id="project-status" name="status" value={form.status} onChange={handleChange}>
             {!isEditing && <option value="">Selecione uma opção</option>}
-            <option value="Planejado">Planejado</option>
-            <option value="Em andamento">Em andamento</option>
-            <option value="Concluído">Concluído</option>
+            {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
           </select>
         </div>
 
@@ -211,7 +211,20 @@ function ProjectForm({ mode, initialProject, onCancel, onSuccess }) {
   );
 }
 
-function ProjectList({ projects, loading, error, notice, onCreate, onDetails }) {
+function ProjectList({
+  projects,
+  loading,
+  error,
+  notice,
+  selectedStatus,
+  onStatusChange,
+  onCreate,
+  onDetails,
+}) {
+  const visibleProjects = selectedStatus === ALL_STATUSES
+    ? projects
+    : projects.filter(({ status }) => status === selectedStatus);
+
   return (
     <main>
       <section className="hero" id="inicio">
@@ -242,15 +255,39 @@ function ProjectList({ projects, loading, error, notice, onCreate, onDetails }) 
         </div>
 
         {notice && <div className="message message-success" role="status">{notice}</div>}
+
+        <div className="filter-toolbar">
+          <div className="filter-field">
+            <label htmlFor="status-filter">Filtrar por status</label>
+            <select
+              id="status-filter"
+              value={selectedStatus}
+              onChange={(event) => onStatusChange(event.target.value)}
+              disabled={loading || Boolean(error)}
+            >
+              <option value={ALL_STATUSES}>{ALL_STATUSES}</option>
+              {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </div>
+          {!loading && !error && projects.length > 0 && (
+            <p className="filter-summary" role="status">
+              {visibleProjects.length} {visibleProjects.length === 1 ? "projeto exibido" : "projetos exibidos"}
+            </p>
+          )}
+        </div>
+
         {loading && <div className="state-card" role="status">Carregando projetos...</div>}
         {!loading && error && <div className="state-card state-error" role="alert">{error}</div>}
         {!loading && !error && projects.length === 0 && (
           <div className="state-card">Nenhum projeto cadastrado até o momento.</div>
         )}
+        {!loading && !error && projects.length > 0 && visibleProjects.length === 0 && (
+          <div className="state-card">Nenhum projeto com o status “{selectedStatus}”.</div>
+        )}
 
-        {!loading && !error && projects.length > 0 && (
+        {!loading && !error && visibleProjects.length > 0 && (
           <div className="project-grid">
-            {projects.map((project) => (
+            {visibleProjects.map((project) => (
               <article className="project-card" key={project._id}>
                 <div className="card-topline">
                   <span className="project-symbol" aria-hidden="true"><span /></span>
@@ -448,12 +485,9 @@ function App() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const [detailNotice, setDetailNotice] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState(ALL_STATUSES);
 
   useEffect(() => {
-    if (screen.name !== "list") {
-      return undefined;
-    }
-
     const controller = new AbortController();
     setListLoading(true);
     setListError("");
@@ -472,7 +506,7 @@ function App() {
       });
 
     return () => controller.abort();
-  }, [screen.name, listVersion]);
+  }, [listVersion]);
 
   useEffect(() => {
     if (screen.name !== "details") {
@@ -505,9 +539,6 @@ function App() {
   }, [screen]);
 
   function navigateToList(section = "projetos", notice = "") {
-    if (screen.name !== "list") {
-      setListLoading(true);
-    }
     setListNotice(notice);
     setScreen({ name: "list" });
     window.setTimeout(() => {
@@ -538,6 +569,9 @@ function App() {
   }
 
   function handleEditSuccess(updatedProject, changed) {
+    setProjects((currentProjects) => currentProjects.map((currentProject) => (
+      currentProject._id === updatedProject._id ? updatedProject : currentProject
+    )));
     navigateToDetails(
       updatedProject._id,
       changed ? "Projeto atualizado com sucesso." : "Nenhuma alteração foi necessária.",
@@ -565,6 +599,8 @@ function App() {
           loading={listLoading}
           error={listError}
           notice={listNotice}
+          selectedStatus={selectedStatus}
+          onStatusChange={setSelectedStatus}
           onCreate={navigateToCreate}
           onDetails={(id) => navigateToDetails(id)}
         />
